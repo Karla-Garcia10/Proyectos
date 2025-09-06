@@ -1,0 +1,105 @@
+---
+title: "Exercise_StockReturns"
+author: "Karla García Ávila"
+format: pdf
+editor: visual
+---
+
+```{r}
+#| include: False
+library(tidyverse)
+library(ggplot2)
+library(tidyfinance)
+library(moderndive)
+library(dplyr)
+library(forecast)
+library(quantmod)
+library(scales)
+```
+
+## Exercise1
+
+Daily prices for another stock market symbol of your choice from Yahoo Finance using `download_data()` from the `tidyfinance` package. Plot two time series of the symbol’s un-adjusted and adjusted closing prices. Explain any visible differences.
+
+```{r}
+banks <- download_data(type = "stock_prices", symbol = 'HSBC', start_date = '2000-01-01', end_date = '2025-01-01')
+
+banks_daily <- banks |>
+  arrange(desc(date))|>
+  mutate(rate_close = close/lag(close)-1, 
+         rate_adclose = adjusted_close/lag(adjusted_close)-1)|>
+  select(symbol, date, rate_close, rate_adclose)
+
+banks_daily <- banks_daily |> 
+  drop_na(c(rate_close,rate_adclose))
+
+```
+
+```{r}
+banks |>
+  ggplot(aes(x = date))+
+  geom_line(aes(y = close, col = 'Close prices'))+
+  geom_line(aes(y = adjusted_close, col = 'Adjusted close prices'))+
+  labs(title = "HSBC aprices ", color = "Legend" )+
+  scale_color_manual(values  =c('Close prices'=  "#52A88C",'Adjusted close prices'= "#98D7B7"))
+  
+
+```
+
+## Exercise 2
+
+Compute daily net returns for an asset of your choice and visualize the distribution of daily returns in a histogram using 100 bins. Also, use `geom_vline()` to add a dashed red vertical line that indicates the 5 percent quantile of the daily returns. Compute summary statistics (mean, standard deviation, minimum, and maximum) for the daily returns.
+
+```{r}
+q_5 <- quantile(banks_daily$rate_adclose, probs = 0.05)
+
+banks_daily |>
+  ggplot(aes(x = rate_adclose, fill ="#926590"))+
+  geom_histogram(bins = 100)+
+  geom_vline(xintercept = q_5, linetype = "dashed")+
+  theme(legend.position = 'none')+
+  scale_x_continuous('percent')
+  
+```
+
+```{r}
+banks_daily |>
+  summarise(across(rate_adclose, list(
+    return_mean = mean,
+    return_deviation = sd,
+    return_minium = min,
+    return_max = max
+  ), .names = '{.fn}')) |>
+  print(n = Inf)
+```
+
+# Exercise 3
+
+Take your code from the previous exercises and generalize it such that you can perform all the computations for an arbitrary number of symbols (e.g., `symbol <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
+
+```{r}
+purpose <- download_data(type = 'stock_prices',symbols = c("JPM","BAC", "XOM"), start_date = '2017-01-01',end_date = '2025-01-01')
+
+purpose <- purpose |>
+  group_by(symbol)|>
+  select( symbol,volume, date,close, adjusted_close)
+
+```
+
+```{r}
+purpose |>
+  ggplot(aes(x = date))+
+  geom_line(aes(y = adjusted_close, col = symbol))
+
+```
+
+```{r}
+purpose_trading <- purpose |>
+  group_by(symbol,date)|>
+  mutate(tradding = sum(volume*adjusted_close))
+
+
+ggplot(data = purpose_trading, aes(x = date,y = tradding, col = symbol))+
+  geom_line()+
+  scale_y_continuous(labels(unit_format(unit = 'B', scale = 1e-9)))
+```
